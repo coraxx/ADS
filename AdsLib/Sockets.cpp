@@ -12,6 +12,9 @@
 #include <limits>
 #include <sstream>
 #include <system_error>
+#include <arpa/inet.h>
+#include <netinet/in.h>
+#include <sys/socket.h>
 
 namespace bhf
 {
@@ -49,6 +52,18 @@ static void ParseHostAndPort(std::string &host, std::string &port)
 	}
 }
 
+// Helper function to check if a string is a valid IPv4 address
+static bool IsIPv4Address(const std::string& str) {
+	struct sockaddr_in sa;
+	return inet_pton(AF_INET, str.c_str(), &(sa.sin_addr)) == 1;
+}
+
+// Helper function to check if a string is a valid IPv6 address
+static bool IsIPv6Address(const std::string& str) {
+	struct sockaddr_in6 sa;
+	return inet_pton(AF_INET6, str.c_str(), &(sa.sin6_addr)) == 1;
+}
+
 AddressList GetListOfAddresses(const std::string &hostPort,
 			       const std::string &defaultPort)
 {
@@ -57,6 +72,68 @@ AddressList GetListOfAddresses(const std::string &hostPort,
 	ParseHostAndPort(host, service);
 
 	InitSocketLibrary();
+	
+	// For IP addresses, manually create addrinfo to avoid getaddrinfo (which uses PF_SYSTEM sockets)
+	// This is necessary for App Sandbox compatibility
+	if (IsIPv4Address(host) || IsIPv6Address(host)) {
+		struct addrinfo *result = static_cast<struct addrinfo*>(calloc(1, sizeof(struct addrinfo)));
+		if (!result) {
+			throw std::runtime_error("Memory allocation failed");
+		}
+		
+		struct sockaddr_storage *addr = static_cast<struct sockaddr_storage*>(calloc(1, sizeof(struct sockaddr_storage)));
+		if (!addr) {
+			free(result);
+			throw std::runtime_error("Memory allocation failed");
+		}
+		
+		unsigned short port = 0;
+		if (!service.empty()) {
+			port = static_cast<unsigned short>(std::stoul(service));
+		}
+		
+		if (IsIPv4Address(host)) {
+			result->ai_family = AF_INET;
+			result->ai_socktype = SOCK_STREAM;
+			result->ai_protocol = IPPROTO_TCP;
+			result->ai_addrlen = sizeof(struct sockaddr_in);
+			
+			struct sockaddr_in *sin = reinterpret_cast<struct sockaddr_in*>(addr);
+			sin->sin_family = AF_INET;
+			sin->sin_port = htons(port);
+			if (inet_pton(AF_INET, host.c_str(), &sin->sin_addr) != 1) {
+				free(addr);
+				free(result);
+				throw std::runtime_error("Invalid IPv4 address: " + host);
+			}
+		} else { // IPv6
+			result->ai_family = AF_INET6;
+			result->ai_socktype = SOCK_STREAM;
+			result->ai_protocol = IPPROTO_TCP;
+			result->ai_addrlen = sizeof(struct sockaddr_in6);
+			
+			struct sockaddr_in6 *sin6 = reinterpret_cast<struct sockaddr_in6*>(addr);
+			sin6->sin6_family = AF_INET6;
+			sin6->sin6_port = htons(port);
+			if (inet_pton(AF_INET6, host.c_str(), &sin6->sin6_addr) != 1) {
+				free(addr);
+				free(result);
+				throw std::runtime_error("Invalid IPv6 address: " + host);
+			}
+		}
+		
+		result->ai_addr = reinterpret_cast<struct sockaddr*>(addr);
+		result->ai_next = nullptr;
+		
+		return AddressList{ result, [](struct addrinfo *p) {
+			if (p && p->ai_addr) {
+				free(p->ai_addr);
+			}
+			free(p);
+		}};
+	}
+	
+	// For hostnames, fall back to getaddrinfo (may fail in sandbox)
 	struct addrinfo *results;
 	if (getaddrinfo(host.c_str(), service.c_str(), nullptr, &results)) {
 		throw std::runtime_error("Invalid or unknown host: " + host);
@@ -78,9 +155,17 @@ static const struct addrinfo addrinfo = []() {
 
 uint32_t getIpv4(const std::string &addr)
 {
-	struct addrinfo *res;
-
 	InitSocketLibrary();
+	
+	// Try direct IPv4 parsing first (sandbox-compatible)
+	struct sockaddr_in sin;
+	if (inet_pton(AF_INET, addr.c_str(), &sin.sin_addr) == 1) {
+		WSACleanup();
+		return ntohl(sin.sin_addr.s_addr);
+	}
+	
+	// Fall back to getaddrinfo for hostnames (may fail in sandbox)
+	struct addrinfo *res;
 	const auto status = getaddrinfo(addr.c_str(), nullptr, &addrinfo, &res);
 	if (status) {
 		throw std::runtime_error(

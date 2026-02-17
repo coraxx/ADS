@@ -70,10 +70,10 @@ AdsHandle AdsDevice::GetHandle(const std::string &symbolName) const
 {
 	uint32_t handle = 0;
 	uint32_t bytesRead = 0;
-	uint32_t error = ReadWriteReqEx2(ADSIGRP_SYM_HNDBYNAME, 0,
+	uint32_t error = static_cast<uint32_t>(ReadWriteReqEx2(ADSIGRP_SYM_HNDBYNAME, 0,
 					 sizeof(handle), &handle,
 					 symbolName.size(), symbolName.c_str(),
-					 &bytesRead);
+					 &bytesRead));
 
 	if (error || (sizeof(handle) != bytesRead)) {
 		throw AdsException(error);

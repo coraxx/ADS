@@ -12,7 +12,7 @@ struct Frame {
 	/**
      * @brief Frame
      * @param length number of bytes preallocated in the internale buffer
-     * @param data, if not null this frame will be initialized with <lenght> number of bytes from <data>
+     * @param data if not null this frame will be initialized with <lenght> number of bytes from <data>
      */
 	Frame(size_t length, const void *data = nullptr);
 
@@ -20,7 +20,7 @@ struct Frame {
      * @brief operator []
      * bytewise access to the frame bytes
      * @param index should be within the frames bounds!
-     * @return
+     * @return byte value at the specified index
      */
 	uint8_t operator[](size_t index) const;
 
@@ -87,7 +87,7 @@ struct Frame {
 	/**
      * @brief prepend
      * prepend <data> in front of the frame
-     * @param data
+     * @param data pointer to data to prepend
      * @param size number of bytes in <data>
      * @return reference to self
      */
@@ -111,7 +111,7 @@ struct Frame {
 	/**
      * @brief remove
      * remove <numBytest> from the beginning of the frame
-     * @param numBytes
+     * @param numBytes number of bytes to remove
      * @return reference to self
      */
 	Frame &remove(size_t numBytes);

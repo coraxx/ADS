@@ -259,8 +259,8 @@ size_t Socket::read(uint8_t *buffer, size_t maxBytes, timeval *timeout) const
 
 	const auto msvcMaxBytes = static_cast<int>(
 		std::min<size_t>(std::numeric_limits<int>::max(), maxBytes));
-	const int bytesRead = recv(m_Socket, reinterpret_cast<char *>(buffer),
-				   msvcMaxBytes, 0);
+	const int bytesRead = static_cast<int>(recv(m_Socket, reinterpret_cast<char *>(buffer),
+				   msvcMaxBytes, 0));
 	if (bytesRead > 0) {
 		return bytesRead;
 	}
@@ -327,8 +327,8 @@ size_t Socket::write(const Frame &frame) const
 
 	const int bufferLength = static_cast<int>(frame.size());
 	const char *const buffer = reinterpret_cast<const char *>(frame.data());
-	const int status = sendto(m_Socket, buffer, bufferLength, 0, m_DestAddr,
-				  m_DestAddrLen);
+	const int status = static_cast<int>(sendto(m_Socket, buffer, bufferLength, 0, m_DestAddr,
+				  m_DestAddrLen));
 
 	if (SOCKET_ERROR == status) {
 		LOG_ERROR("write frame failed with error: "

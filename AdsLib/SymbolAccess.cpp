@@ -166,7 +166,7 @@ int SymbolAccess::Read(const std::string &name, std::ostream &os) const
 	if (ADSERR_NOERR != status) {
 		LOG_ERROR(__FUNCTION__ << "(): failed with: 0x" << std::hex
 				       << status << '\n');
-		return status;
+		return static_cast<int>(status);
 	}
 
 	switch (entry.header.dataType) {
@@ -248,8 +248,8 @@ int SymbolAccess::Write(const SymbolEntry &entry, const std::string &v) const
 	}
 
 	value = bhf::ads::htole(value);
-	return device.WriteReqEx(entry.header.iGroup, entry.header.iOffs,
-				 sizeof(value), &value);
+	return static_cast<int>(device.WriteReqEx(entry.header.iGroup, entry.header.iOffs,
+				 sizeof(value), &value));
 }
 
 template <>
@@ -279,8 +279,8 @@ int SymbolAccess::Write<uint8_t>(const SymbolEntry &entry,
 		return ADSERR_DEVICE_INVALIDDATA;
 	}
 	auto value = static_cast<uint8_t>(integer_value);
-	return device.WriteReqEx(entry.header.iGroup, entry.header.iOffs,
-				 sizeof(value), &value);
+	return static_cast<int>(device.WriteReqEx(entry.header.iGroup, entry.header.iOffs,
+				 sizeof(value), &value));
 }
 
 template <>
@@ -293,8 +293,8 @@ int SymbolAccess::Write<std::string>(const SymbolEntry &entry,
 	// string with a shorter string, should overwrite the old string entirely!
 	auto buffer = value;
 	buffer.resize(entry.header.size);
-	return device.WriteReqEx(entry.header.iGroup, entry.header.iOffs,
-				 buffer.size(), buffer.data());
+	return static_cast<int>(device.WriteReqEx(entry.header.iGroup, entry.header.iOffs,
+				 buffer.size(), buffer.data()));
 }
 
 int SymbolAccess::Write(const std::string &name, const std::string &value) const

@@ -320,12 +320,17 @@ bool AmsConnection::ReceiveNotification(const AoEHeader &header)
 	return true;
 }
 
+/** Optional callback when the connection is closed by the remote (e.g. server stopped).
+ *  Implemented by the application/bridge to update UI (e.g. post notification). */
+extern "C" void ads_connection_closed_callback(void);
+
 void AmsConnection::TryRecv()
 {
 	try {
 		Recv();
 	} catch (const std::runtime_error &e) {
 		LOG_INFO(e.what());
+		ads_connection_closed_callback();
 	}
 }
 
